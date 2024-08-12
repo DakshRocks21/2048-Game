@@ -35,9 +35,7 @@ class Game2048:
     def __init__(self, size=4):
         self.size = size
         self.board = [[0] * size for _ in range(size)]
-        self.previous_board = None
         self.score = 0
-        self.previous_score = 0
         self.add_new_tile()
         self.add_new_tile()
         pygame.init()
@@ -172,21 +170,6 @@ class Game2048:
 
         pygame.display.update()
 
-    def save_state(self):
-        """
-        Save the current state of the game for undo functionality
-        """
-        self.previous_board = copy.deepcopy(self.board)
-        self.previous_score = self.score
-
-    def undo(self):
-        """
-        Revert to the previous state of the game
-        """
-        if self.previous_board:
-            self.board = self.previous_board
-            self.score = self.previous_score
-
     def handle_game_over(self):
         """
         Handles the game over screen and allows the player to restart or quit
@@ -208,6 +191,7 @@ class Game2048:
         Main game loop that handles drawing and user input
         """
         running = True
+        ai = WordleAI(self)
         while running:
             self.draw_board()
             for event in pygame.event.get():
@@ -216,7 +200,6 @@ class Game2048:
                     pygame.quit()
                     sys.exit()
                 elif event.type == pygame.KEYDOWN:
-                    self.save_state()
                     if event.key == pygame.K_UP:
                         changed = self.move_up()
                     elif event.key == pygame.K_LEFT:
@@ -225,9 +208,16 @@ class Game2048:
                         changed = self.move_down()
                     elif event.key == pygame.K_RIGHT:
                         changed = self.move_right()
-                    elif event.key == pygame.K_u:
-                        self.undo()
-                        changed = False
+                    elif event.key == pygame.K_a:  # AI Move
+                        ai_move = ai.get_next_move()
+                        if ai_move == "UP":
+                            changed = self.move_up()
+                        elif ai_move == "DOWN":
+                            changed = self.move_down()
+                        elif ai_move == "LEFT":
+                            changed = self.move_left()
+                        elif ai_move == "RIGHT":
+                            changed = self.move_right()
                     else:
                         continue
 
@@ -236,6 +226,49 @@ class Game2048:
                         if self.is_game_over():
                             self.handle_game_over()
 
+
+class WordleAI:
+    def __init__(self, game):
+        self.game = game
+
+    def get_next_move(self):
+        """
+        Determines the best move by simulating all possible moves and choosing the one with the highest score or tile merge.
+        """
+        moves = ["UP", "DOWN", "LEFT", "RIGHT"]
+        move_scores = {}
+
+        for move in moves:
+            # Manually copy the game state (board and score)
+            temp_board = copy.deepcopy(self.game.board)
+            temp_score = self.game.score
+
+            if move == "UP":
+                self.game.move_up()
+            elif move == "DOWN":
+                self.game.move_down()
+            elif move == "LEFT":
+                self.game.move_left()
+            elif move == "RIGHT":
+                self.game.move_right()
+            
+            if self.game.is_game_over():
+                move_scores[move] = -1
+            else:
+                move_scores[move] = self.game.score
+            
+            print(move, move_scores[move])
+            # Restore the game state
+            self.game.board = temp_board
+            self.game.score = temp_score
+        
+        best_move = max(move_scores, key=move_scores.get)
+        if move_scores[best_move] == -1:
+            return "UP"
+        print(move_scores)
+        print(best_move)
+        return best_move
+        
 if __name__ == "__main__":
     game = Game2048()
     game.play()
