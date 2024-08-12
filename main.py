@@ -210,6 +210,8 @@ class Game2048:
                         changed = self.move_right()
                     elif event.key == pygame.K_a:  # AI Move
                         ai_move = ai.get_next_move()
+                        print(f"AI suggests moving {ai_move}")
+                        """
                         if ai_move == "UP":
                             changed = self.move_up()
                         elif ai_move == "DOWN":
@@ -218,6 +220,8 @@ class Game2048:
                             changed = self.move_left()
                         elif ai_move == "RIGHT":
                             changed = self.move_right()
+                        """
+                        changed = False
                     else:
                         continue
 
@@ -236,7 +240,7 @@ class WordleAI:
         Determines the best move by simulating all possible moves and choosing the one with the highest score or tile merge.
         """
         moves = ["UP", "DOWN", "LEFT", "RIGHT"]
-        move_scores = {}
+        valid_moves  = {}
 
         for move in moves:
             # Manually copy the game state (board and score)
@@ -244,31 +248,33 @@ class WordleAI:
             temp_score = self.game.score
 
             if move == "UP":
-                self.game.move_up()
+                changed = self.game.move_up()
             elif move == "DOWN":
-                self.game.move_down()
+                changed = self.game.move_down()
             elif move == "LEFT":
-                self.game.move_left()
+                changed = self.game.move_left()
             elif move == "RIGHT":
-                self.game.move_right()
-            
-            if self.game.is_game_over():
-                move_scores[move] = -1
-            else:
-                move_scores[move] = self.game.score
-            
-            print(move, move_scores[move])
+                changed = self.game.move_right()
+
+            if changed:  # Only consider the move if it actually changes the board
+                if self.game.is_game_over():
+                    valid_moves[move] = -1
+                else:
+                    valid_moves[move] = self.game.score
+
             # Restore the game state
             self.game.board = temp_board
             self.game.score = temp_score
+
+        if not valid_moves:
+            return None
+
+        best_move = max(valid_moves, key=valid_moves.get)
+        print(valid_moves)
         
-        best_move = max(move_scores, key=move_scores.get)
-        if move_scores[best_move] == -1:
-            return "UP"
-        print(move_scores)
-        print(best_move)
         return best_move
-        
+
+
 if __name__ == "__main__":
     game = Game2048()
     game.play()
