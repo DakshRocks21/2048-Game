@@ -1,4 +1,30 @@
+import pygame
+import sys
 import random
+
+# Define constants for the game
+SIZE = 4
+TILE_SIZE = 100
+MARGIN = 10
+WIDTH = SIZE * TILE_SIZE + (SIZE + 1) * MARGIN
+HEIGHT = WIDTH
+FONT_SIZE = 36
+BACKGROUND_COLOR = (187, 173, 160)
+TILE_COLORS = {
+    0: (205, 193, 180),
+    2: (238, 228, 218),
+    4: (237, 224, 200),
+    8: (242, 177, 121),
+    16: (245, 149, 99),
+    32: (246, 124, 95),
+    64: (246, 94, 59),
+    128: (237, 207, 114),
+    256: (237, 204, 97),
+    512: (237, 200, 80),
+    1024: (237, 197, 63),
+    2048: (237, 194, 46),
+}
+TEXT_COLOR = (119, 110, 101)
 
 class Game2048:
     def __init__(self, size=4):
@@ -6,8 +32,15 @@ class Game2048:
         self.board = [[0] * size for _ in range(size)]
         self.add_new_tile()
         self.add_new_tile()
-    
+        pygame.init()
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption('2048')
+        self.font = pygame.font.SysFont('arial', FONT_SIZE)
+
     def add_new_tile(self):
+        """
+        Adds a new tile (2 or 4) to a random empty cell on the board
+        """
         empty_cells = [(i, j) for i in range(self.size) for j in range(self.size) if self.board[i][j] == 0]
         if not empty_cells:
             return False
@@ -16,11 +49,17 @@ class Game2048:
         return True
 
     def compress(self, row):
+        """
+        Compress the row by moving all non-zero elements to the left side
+        """
         new_row = [i for i in row if i != 0]
         new_row += [0] * (self.size - len(new_row))
         return new_row
 
     def merge(self, row):
+        """
+        Merge the row by adding the same adjacent elements
+        """
         for i in range(self.size - 1):
             if row[i] == row[i + 1] and row[i] != 0:
                 row[i] *= 2
@@ -28,6 +67,9 @@ class Game2048:
         return row
 
     def move_left(self):
+        """
+        Move all tiles to the left and merge
+        """
         changed = False
         new_board = []
         for row in self.board:
@@ -41,31 +83,49 @@ class Game2048:
         return changed
 
     def move_right(self):
+        """
+        Flips the board and moves left and then flips it back
+        """
         self.reverse()
         changed = self.move_left()
         self.reverse()
         return changed
 
     def move_up(self):
+        """
+        Turns the board, moves left and then turns it back
+        """
         self.transpose()
         changed = self.move_left()
         self.transpose()
         return changed
 
     def move_down(self):
+        """
+        Turns the board, moves right (which flips it, compresses it, and flips it back) and then turns it back
+        """
         self.transpose()
         changed = self.move_right()
         self.transpose()
         return changed
 
     def reverse(self):
+        """
+        Reverses all the rows of the board
+        """
         for i in range(self.size):
             self.board[i] = self.board[i][::-1]
 
     def transpose(self):
+        """
+        Turns the columns of the board into rows
+        """
         self.board = [list(row) for row in zip(*self.board)]
 
     def is_game_over(self):
+        """
+        Check if the game is over by checking if there are any empty cells or if there are any adjacent cells with the same value
+        """
         for i in range(self.size):
             for j in range(self.size):
                 if self.board[i][j] == 0:
@@ -76,35 +136,59 @@ class Game2048:
                     return False
         return True
 
-    def print_board(self):
-        for row in self.board:
-            print("\t".join(map(str, row)))
-        print()
+    def draw_board(self):
+        """
+        Draw the board on the screen
+        """
+        self.screen.fill(BACKGROUND_COLOR)
+        for row in range(self.size):
+            for col in range(self.size):
+                value = self.board[row][col]
+                color = TILE_COLORS[value]
+                rect = pygame.Rect(
+                    MARGIN + col * (TILE_SIZE + MARGIN),
+                    MARGIN + row * (TILE_SIZE + MARGIN),
+                    TILE_SIZE, TILE_SIZE
+                )
+                pygame.draw.rect(self.screen, color, rect)
+                if value != 0:
+                    text_surface = self.font.render(str(value), True, TEXT_COLOR)
+                    text_rect = text_surface.get_rect(center=rect.center)
+                    self.screen.blit(text_surface, text_rect)
+        pygame.display.update()
 
     def play(self):
-        while True:
-            self.print_board()
-            move = input("Enter move (w/a/s/d): ").strip().lower()
-            if move in ['w', 'a', 's', 'd']:
-                if move == 'w':
-                    changed = self.move_up()
-                elif move == 'a':
-                    changed = self.move_left()
-                elif move == 's':
-                    changed = self.move_down()
-                elif move == 'd':
-                    changed = self.move_right()
-                else:
-                    continue
+        """
+        Main game loop that handles drawing and user input
+        """
+        running = True
+        while running:
+            self.draw_board()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        changed = self.move_up()
+                    elif event.key == pygame.K_LEFT:
+                        changed = self.move_left()
+                    elif event.key == pygame.K_DOWN:
+                        changed = self.move_down()
+                    elif event.key == pygame.K_RIGHT:
+                        changed = self.move_right()
+                    else:
+                        continue
 
-                if changed:
-                    self.add_new_tile()
-                    if self.is_game_over():
-                        self.print_board()
-                        print("Game Over!")
-                        break
-            else:
-                print("Invalid move! Please enter w, a, s, or d.")
+                    if changed:
+                        self.add_new_tile()
+                        if self.is_game_over():
+                            self.draw_board()
+                            print("Game Over!")
+                            pygame.time.wait(2000)
+                            running = False
+                            break
 
 if __name__ == "__main__":
     game = Game2048()
