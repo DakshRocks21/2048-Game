@@ -231,13 +231,15 @@ class Game2048:
                             self.handle_game_over()
 
 
+import math
+
 class WordleAI:
     def __init__(self, game):
         self.game = game
 
     def simulate_move(self, board, score, move):
         """
-        Simulates a move and returns the resulting board and score.
+        Simulates a move and returns the resulting board, score, and whether the move was effective.
         """
         temp_game = Game2048(self.game.size)
         temp_game.board = copy.deepcopy(board)
@@ -267,9 +269,60 @@ class WordleAI:
                 possible_boards.append((new_board, score))
         return possible_boards
 
+    def monotonicity_score(self, board):
+        """
+        Calculates how "monotonic" the board is, rewarding boards where values consistently increase or decrease along rows or columns.
+        """
+        score = 0
+        for i in range(self.game.size):
+            for j in range(self.game.size - 1):
+                if board[i][j] != 0:
+                    if board[i][j] >= board[i][j + 1]:
+                        score += board[i][j]
+                    if board[j][i] >= board[j + 1][i]:
+                        score += board[j][i]
+        return score
+
+    def clustering_score(self, board):
+        """
+        Rewards board configurations where similar tiles are close together, which can facilitate future merges.
+        """
+        score = 0
+        for i in range(self.game.size):
+            for j in range(self.game.size):
+                if board[i][j] == 0:
+                    continue
+                for ni, nj in [(i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1)]:
+                    if 0 <= ni < self.game.size and 0 <= nj < self.game.size and board[ni][nj] != 0:
+                        score -= abs(board[i][j] - board[ni][nj])
+        return score
+
+    def corner_preference_score(self, board):
+        """
+        Encourages higher tiles to be placed in the corners of the board, which is a common strategy for 2048.
+        """
+        max_tile = max([board[i][j] for i in range(self.game.size) for j in range(self.game.size)])
+        if board[0][0] == max_tile or board[0][self.game.size - 1] == max_tile or \
+           board[self.game.size - 1][0] == max_tile or board[self.game.size - 1][self.game.size - 1] == max_tile:
+            return max_tile * 2  # Strong preference for corners
+        return 0
+
+    def calculate_board_score(self, board, score):
+        """
+        Evaluates the board by combining different heuristics to produce a single score.
+        """
+        monotonicity = self.monotonicity_score(board)
+        clustering = self.clustering_score(board)
+        corner_preference = self.corner_preference_score(board)
+        empty_cells = sum([1 for i in range(self.game.size) for j in range(self.game.size) if board[i][j] == 0])
+
+        # Combine scores, giving weight to each heuristic
+        total_score = score + monotonicity + clustering + corner_preference + math.log2(empty_cells + 1) * 10
+        return total_score
+
     def get_best_move(self):
         """
-        Determines the best move by looking ahead up to 3 moves and considering probabilities.
+        Determines the best move by looking ahead up to 3 moves, considering board heuristics and probabilities.
         """
         moves = ["UP", "DOWN", "LEFT", "RIGHT"]
         best_score = -1
@@ -304,11 +357,12 @@ class WordleAI:
                             if not changed3:
                                 continue
 
-                            second_move_score += score_after_third_move  # Accumulate score across all possible third moves
+                            third_move_score = self.calculate_board_score(board_after_third_move, score_after_third_move)
+                            second_move_score += third_move_score
 
-                    first_move_score += second_move_score / len(possible_boards_after_second)  # Average the second move's score
+                    first_move_score += second_move_score / len(possible_boards_after_second)
 
-            first_move_score /= len(possible_boards_after_first)  # Average the first move's score
+            first_move_score /= len(possible_boards_after_first)
             print(f"Move {move}: Average Score {first_move_score}")
 
             if first_move_score > best_score:
@@ -340,7 +394,6 @@ class WordleAI:
         print(f"Best move is {best_move}")
         print(f"Sequence of moves: {best_sequence}")
         return best_move
-
 
 if __name__ == "__main__":
     game = Game2048()
