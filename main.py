@@ -235,45 +235,93 @@ class WordleAI:
     def __init__(self, game):
         self.game = game
 
-    def get_next_move(self):
+    def simulate_move(self, board, score, move):
         """
-        Determines the best move by simulating all possible moves and choosing the one with the highest score or tile merge.
+        Simulates a move and returns the resulting board and score.
+        """
+        temp_game = Game2048(self.game.size)
+        temp_game.board = copy.deepcopy(board)
+        temp_game.score = score
+        
+        if move == "UP":
+            changed = temp_game.move_up()
+        elif move == "DOWN":
+            changed = temp_game.move_down()
+        elif move == "LEFT":
+            changed = temp_game.move_left()
+        elif move == "RIGHT":
+            changed = temp_game.move_right()
+
+        return temp_game.board, temp_game.score, changed
+
+    def get_best_move(self):
+        """
+        Determines the best move by looking ahead up to 3 moves.
         """
         moves = ["UP", "DOWN", "LEFT", "RIGHT"]
-        valid_moves  = {}
+        best_score = -1
+        best_move = None
+        best_sequence = []
 
         for move in moves:
-            # Manually copy the game state (board and score)
-            temp_board = copy.deepcopy(self.game.board)
-            temp_score = self.game.score
+            # Simulate first move
+            board_after_first_move, score_after_first_move, changed = self.simulate_move(self.game.board, self.game.score, move)
+            
+            # Skip move if it doesn't change the board
+            if not changed:
+                continue
 
-            if move == "UP":
-                changed = self.game.move_up()
-            elif move == "DOWN":
-                changed = self.game.move_down()
-            elif move == "LEFT":
-                changed = self.game.move_left()
-            elif move == "RIGHT":
-                changed = self.game.move_right()
+            #print(f"Move 1: {move}, Score: {score_after_first_move}")
 
-            if changed:  # Only consider the move if it actually changes the board
-                if self.game.is_game_over():
-                    valid_moves[move] = -1
-                else:
-                    valid_moves[move] = self.game.score
+            for move2 in moves:
+                board_after_second_move, score_after_second_move, changed2 = self.simulate_move(board_after_first_move, score_after_first_move, move2)
+                
+                # Skip move if it doesn't change the board
+                if not changed2:
+                    continue
 
-            # Restore the game state
-            self.game.board = temp_board
-            self.game.score = temp_score
+                #print(f"Move 2: {move2}, Score: {score_after_second_move}")
 
-        if not valid_moves:
-            return None
+                for move3 in moves:
+                    board_after_third_move, score_after_third_move, changed3 = self.simulate_move(board_after_second_move, score_after_second_move, move3)
+                    
+                    # Skip move if it doesn't change the board
+                    if not changed3:
+                        continue
 
-        best_move = max(valid_moves, key=valid_moves.get)
-        print(valid_moves)
+                    #print(f"Move 3: {move3}, Score: {score_after_third_move}")
+
+                    # Determine if this sequence results in a higher score
+                    if score_after_third_move > best_score:
+                        best_score = score_after_third_move
+                        best_move = move
+                        best_sequence = [move, move2, move3]
+
+            print(f"Best score for move {move}: {best_score}, Best sequence: {best_sequence}")
+
+        return best_move, best_sequence
+
+    def get_next_move(self):
+        """
+        Returns the best move by analyzing the next three possible moves.
+        """
+        best_move, best_sequence = self.get_best_move()
+
+        if best_move is None:
+            # If no valid move found (which is unlikely), default to random valid move
+            valid_moves = ["UP", "DOWN", "LEFT", "RIGHT"]
+            random.shuffle(valid_moves)
+            for move in valid_moves:
+                board_after_move, score_after_move, changed = self.simulate_move(self.game.board, self.game.score, move)
+                if changed:
+                    best_move = move
+                    break
+
+            best_sequence = [best_move]
         
+        print(f"Best move is {best_move}")
+        print(f"Sequence of moves: {best_sequence}")
         return best_move
-
 
 if __name__ == "__main__":
     game = Game2048()
