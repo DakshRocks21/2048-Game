@@ -254,9 +254,22 @@ class WordleAI:
 
         return temp_game.board, temp_game.score, changed
 
+    def get_all_possible_boards(self, board, score):
+        """
+        Generates all possible board states after a move, considering where the new tile might appear.
+        """
+        possible_boards = []
+        empty_cells = [(i, j) for i in range(self.game.size) for j in range(self.game.size) if board[i][j] == 0]
+        for cell in empty_cells:
+            for value in [2, 4]:  # The new tile can be 2 or 4
+                new_board = copy.deepcopy(board)
+                new_board[cell[0]][cell[1]] = value
+                possible_boards.append((new_board, score))
+        return possible_boards
+
     def get_best_move(self):
         """
-        Determines the best move by looking ahead up to 3 moves.
+        Determines the best move by looking ahead up to 3 moves and considering probabilities.
         """
         moves = ["UP", "DOWN", "LEFT", "RIGHT"]
         best_score = -1
@@ -271,34 +284,39 @@ class WordleAI:
             if not changed:
                 continue
 
-            #print(f"Move 1: {move}, Score: {score_after_first_move}")
+            first_move_score = 0
+            possible_boards_after_first = self.get_all_possible_boards(board_after_first_move, score_after_first_move)
 
-            for move2 in moves:
-                board_after_second_move, score_after_second_move, changed2 = self.simulate_move(board_after_first_move, score_after_first_move, move2)
-                
-                # Skip move if it doesn't change the board
-                if not changed2:
-                    continue
+            for (board_after_first, _) in possible_boards_after_first:
+                for move2 in moves:
+                    board_after_second_move, score_after_second_move, changed2 = self.simulate_move(board_after_first, score_after_first_move, move2)
 
-                #print(f"Move 2: {move2}, Score: {score_after_second_move}")
-
-                for move3 in moves:
-                    board_after_third_move, score_after_third_move, changed3 = self.simulate_move(board_after_second_move, score_after_second_move, move3)
-                    
-                    # Skip move if it doesn't change the board
-                    if not changed3:
+                    if not changed2:
                         continue
 
-                    #print(f"Move 3: {move3}, Score: {score_after_third_move}")
+                    second_move_score = 0
+                    possible_boards_after_second = self.get_all_possible_boards(board_after_second_move, score_after_second_move)
 
-                    # Determine if this sequence results in a higher score
-                    if score_after_third_move > best_score:
-                        best_score = score_after_third_move
-                        best_move = move
-                        best_sequence = [move, move2, move3]
+                    for (board_after_second, _) in possible_boards_after_second:
+                        for move3 in moves:
+                            board_after_third_move, score_after_third_move, changed3 = self.simulate_move(board_after_second, score_after_second_move, move3)
 
-            print(f"Best score for move {move}: {best_score}, Best sequence: {best_sequence}")
+                            if not changed3:
+                                continue
 
+                            second_move_score += score_after_third_move  # Accumulate score across all possible third moves
+
+                    first_move_score += second_move_score / len(possible_boards_after_second)  # Average the second move's score
+
+            first_move_score /= len(possible_boards_after_first)  # Average the first move's score
+            print(f"Move {move}: Average Score {first_move_score}")
+
+            if first_move_score > best_score:
+                best_score = first_move_score
+                best_move = move
+                best_sequence = [move]
+
+        print(f"Best score: {best_score}, Best sequence: {best_sequence}")
         return best_move, best_sequence
 
     def get_next_move(self):
@@ -322,6 +340,7 @@ class WordleAI:
         print(f"Best move is {best_move}")
         print(f"Sequence of moves: {best_sequence}")
         return best_move
+
 
 if __name__ == "__main__":
     game = Game2048()
